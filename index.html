@@ -693,19 +693,23 @@ async function loadCity(city) {
   statusEl.className = "status";
 
   try {
+    const tickers = [cfg.high, cfg.low, cfg.rain].filter(Boolean);
+    const uncached = tickers.filter(t => !localCache[t] || Date.now() - localCache[t].time >= CACHE_TTL);
+    const needsDelay = uncached.length > 1;
+
     const highData = await apiFetch(cfg.high);
     const highs = (highData.events || []).map(parseHighTempEvent).filter(Boolean);
 
     let lows = [];
     if (cfg.low) {
-      await sleep(1500);
+      if (needsDelay) await sleep(1000);
       const lowData = await apiFetch(cfg.low);
       lows = (lowData.events || []).map(parseLowTempEvent).filter(Boolean);
     }
 
     let rains = [];
     if (cfg.rain) {
-      await sleep(1500);
+      if (needsDelay) await sleep(1000);
       const rainData = await apiFetch(cfg.rain);
       rains = (rainData.events || []).map(parseRainEvent).filter(Boolean);
     }
