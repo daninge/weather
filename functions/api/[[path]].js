@@ -10,7 +10,11 @@ export async function onRequestGet(context) {
   const cacheKey = new Request(target);
 
   const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    const resp = new Response(cached.body, cached);
+    resp.headers.set("X-Cache", "HIT");
+    return resp;
+  }
 
   const resp = await fetch(target, {
     headers: {
@@ -22,7 +26,10 @@ export async function onRequestGet(context) {
   if (!resp.ok) {
     return new Response(resp.body, {
       status: resp.status,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Cache": "ERROR",
+      },
     });
   }
 
@@ -31,6 +38,7 @@ export async function onRequestGet(context) {
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": `public, max-age=${CACHE_TTL}`,
+      "X-Cache": "MISS",
     },
   });
 

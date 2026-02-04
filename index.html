@@ -487,12 +487,19 @@ window.addEventListener("popstate", () => {
 });
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const localCache = {};
+const CACHE_TTL = 5 * 60 * 1000;
 
 async function apiFetch(seriesTicker) {
+  const cached = localCache[seriesTicker];
+  if (cached && Date.now() - cached.time < CACHE_TTL) return cached.data;
+
   const url = `/api/events?series_ticker=${seriesTicker}&status=open&with_nested_markets=true`;
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`API ${resp.status}`);
-  return resp.json();
+  const data = await resp.json();
+  localCache[seriesTicker] = { data, time: Date.now() };
+  return data;
 }
 
 function parseDateFromTicker(ticker) {
@@ -691,14 +698,14 @@ async function loadCity(city) {
 
     let lows = [];
     if (cfg.low) {
-      await sleep(500);
+      await sleep(1500);
       const lowData = await apiFetch(cfg.low);
       lows = (lowData.events || []).map(parseLowTempEvent).filter(Boolean);
     }
 
     let rains = [];
     if (cfg.rain) {
-      await sleep(500);
+      await sleep(1500);
       const rainData = await apiFetch(cfg.rain);
       rains = (rainData.events || []).map(parseRainEvent).filter(Boolean);
     }
