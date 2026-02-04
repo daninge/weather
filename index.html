@@ -684,25 +684,18 @@ async function loadCity(city) {
   statusEl.className = "status";
 
   try {
-    const fetches = [apiFetch(cfg.high)];
-    if (cfg.low) fetches.push(apiFetch(cfg.low));
-    if (cfg.rain) fetches.push(apiFetch(cfg.rain));
-
-    const results = await Promise.all(fetches);
-
-    const highData = results[0];
+    const highData = await apiFetch(cfg.high);
     const highs = (highData.events || []).map(parseHighTempEvent).filter(Boolean);
 
     let lows = [];
-    let rains = [];
-    let idx = 1;
-
     if (cfg.low) {
-      const lowData = results[idx++];
+      const lowData = await apiFetch(cfg.low);
       lows = (lowData.events || []).map(parseLowTempEvent).filter(Boolean);
     }
+
+    let rains = [];
     if (cfg.rain) {
-      const rainData = results[idx++];
+      const rainData = await apiFetch(cfg.rain);
       rains = (rainData.events || []).map(parseRainEvent).filter(Boolean);
     }
 
