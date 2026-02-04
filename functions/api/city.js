@@ -20,11 +20,15 @@ const CACHE_TTL = 300;
 
 async function kalshiFetch(seriesTicker) {
   const url = `${KALSHI}/events?series_ticker=${seriesTicker}&status=open&with_nested_markets=true`;
-  const resp = await fetch(url, {
-    headers: { "Accept": "application/json", "User-Agent": "kalshi-weather-app" },
-  });
-  if (!resp.ok) return null;
-  return resp.json();
+  for (let i = 0; i < 3; i++) {
+    const resp = await fetch(url, {
+      headers: { "Accept": "application/json", "User-Agent": "kalshi-weather-app" },
+    });
+    if (resp.ok) return resp.json();
+    if (resp.status !== 429) return null;
+    await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+  }
+  return null;
 }
 
 function parseDateFromTicker(ticker) {

@@ -582,35 +582,47 @@ function renderCards(highs, lows, rains) {
   const rainMap = {};
   rains.forEach(r => { if (r) rainMap[r.date] = r; });
 
-  if (!highs.length) {
+  // Build a list of dates from all available data
+  const allDates = new Set();
+  highs.forEach(h => { if (h.date) allDates.add(h.date); });
+  lows.forEach(l => { if (l && l.date) allDates.add(l.date); });
+  rains.forEach(r => { if (r && r.date) allDates.add(r.date); });
+
+  const highMap = {};
+  highs.forEach(h => { if (h) highMap[h.date] = h; });
+
+  const dates = [...allDates].sort();
+
+  if (!dates.length) {
     content.innerHTML = '<div class="loading">No forecast data available for this city.</div>';
     return;
   }
 
-  highs.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  const u = unitLabel();
-
-  const html = '<div class="cards">' + highs.map(h => {
-    const lowData = lowMap[h.date];
+  const html = '<div class="cards">' + dates.map(date => {
+    const h = highMap[date];
+    const lowData = lowMap[date];
     const low = lowData ? lowData.expected : null;
-    const rainData = rainMap[h.date];
+    const rainData = rainMap[date];
     const rain = rainData ? rainData.chance : null;
-    const maxProb = Math.max(...h.bands.map(b => b.prob), 0.01);
-    const icon = weatherIcon(h.expected, rain);
+    const highExp = h ? h.expected : null;
+    const icon = weatherIcon(highExp, rain);
+    const cardUrl = h ? h.url : (lowData ? lowData.url : null);
 
-    return `<div class="card" data-href="${h.url}">
+    return `<div class="card"${cardUrl ? ` data-href="${cardUrl}"` : ''}>
       <div class="card-header">
         <div>
-          <div class="card-date">${formatDate(h.date)}</div>
-          <div class="card-day">${formatDay(h.date)}</div>
+          <div class="card-date">${formatDate(date)}</div>
+          <div class="card-day">${formatDay(date)}</div>
         </div>
         <div class="card-icon">${icon}</div>
       </div>
       <div class="card-temps">
-        <div class="temp-high">${h.expected != null ? temp(h.expected) + '\u00B0' : '\u2014'}</div>
-        ${low != null && lowData.url ? `<div class="temp-divider">/</div><a class="temp-low" href="${lowData.url}" target="_blank" rel="noopener">${temp(low)}\u00B0</a>` : low != null ? `<div class="temp-divider">/</div><div class="temp-low">${temp(low)}\u00B0</div>` : ''}
+        ${highExp != null ? `<div class="temp-high">${temp(highExp)}\u00B0</div>` : ''}
+        ${low != null && highExp != null ? `<div class="temp-divider">/</div>` : ''}
+        ${low != null && lowData.url ? `<a class="temp-low${highExp == null ? ' temp-low-only' : ''}" href="${lowData.url}" target="_blank" rel="noopener">${temp(low)}\u00B0</a>` : low != null ? `<div class="temp-low${highExp == null ? ' temp-low-only' : ''}">${temp(low)}\u00B0</div>` : ''}
+        ${highExp == null && low == null ? `<div class="temp-high">\u2014</div>` : ''}
       </div>
-      <div class="temp-label">${low != null ? 'High / Low' : 'Expected High'}</div>
+      <div class="temp-label">${highExp != null && low != null ? 'High / Low' : highExp != null ? 'Expected High' : low != null ? 'Expected Low' : ''}</div>
       ${rain != null && rainData.url ? `<a class="rain-row" href="${rainData.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">
         <span>\u{1F4A7}</span>
         <span>${rain}%</span>
@@ -620,10 +632,11 @@ function renderCards(highs, lows, rains) {
         <span>${rain}%</span>
         <div class="rain-bar-track"><div class="rain-bar-fill" style="width:${rain}%"></div></div>
       </div>` : ''}
-      <div class="chart">
+      ${h && h.bands && h.bands.length ? `<div class="chart">
         <div class="chart-label">Probability Distribution</div>
         <div class="chart-bars">
           ${h.bands.map(b => {
+            const maxProb = Math.max(...h.bands.map(b => b.prob), 0.01);
             const pct = (b.prob / maxProb) * 100;
             return `<div class="chart-bar" style="height:${Math.max(pct, 4)}%;background:${barColor(b.prob, maxProb)};opacity:0.9">
               <span class="tip">${bandLabel(b)}: ${Math.round(b.prob * 100)}%</span>
@@ -634,7 +647,7 @@ function renderCards(highs, lows, rains) {
           <span>${bandLabel(h.bands[0])}</span>
           <span>${bandLabel(h.bands[h.bands.length - 1])}</span>
         </div>
-      </div>
+      </div>` : ''}
     </div>`;
   }).join('') + '</div>';
 
