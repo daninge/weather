@@ -183,6 +183,8 @@
 
   .card:hover::before { opacity: 1; }
 
+  .card[data-href] { cursor: pointer; }
+
   .card-header {
     display: flex;
     justify-content: space-between;
@@ -241,7 +243,10 @@
     font-weight: 600;
     color: var(--cool);
     margin-bottom: 0.15rem;
+    text-decoration: none;
   }
+
+  a.temp-low:hover { text-decoration: underline; }
 
   .temp-label {
     font-size: 0.65rem;
@@ -264,7 +269,11 @@
     font-size: 0.82rem;
     color: var(--rain);
     font-weight: 500;
+    text-decoration: none;
+    transition: background 0.15s;
   }
+
+  a.rain-row:hover { background: rgba(167, 139, 250, 0.2); }
 
   .rain-bar-track {
     flex: 1;
@@ -568,9 +577,9 @@ function renderCards(highs, lows, rains) {
   lastData = { highs, lows, rains };
 
   const lowMap = {};
-  lows.forEach(l => { if (l) lowMap[l.date] = l.expected; });
+  lows.forEach(l => { if (l) lowMap[l.date] = l; });
   const rainMap = {};
-  rains.forEach(r => { if (r) rainMap[r.date] = r.chance; });
+  rains.forEach(r => { if (r) rainMap[r.date] = r; });
 
   if (!highs.length) {
     content.innerHTML = '<div class="loading">No forecast data available for this city.</div>';
@@ -581,12 +590,14 @@ function renderCards(highs, lows, rains) {
   const u = unitLabel();
 
   const html = '<div class="cards">' + highs.map(h => {
-    const low = lowMap[h.date];
-    const rain = rainMap[h.date];
+    const lowData = lowMap[h.date];
+    const low = lowData ? lowData.expected : null;
+    const rainData = rainMap[h.date];
+    const rain = rainData ? rainData.chance : null;
     const maxProb = Math.max(...h.bands.map(b => b.prob), 0.01);
     const icon = weatherIcon(h.expected, rain);
 
-    return `<div class="card">
+    return `<div class="card" data-href="${h.url}">
       <div class="card-header">
         <div>
           <div class="card-date">${formatDate(h.date)}</div>
@@ -596,10 +607,14 @@ function renderCards(highs, lows, rains) {
       </div>
       <div class="card-temps">
         <div class="temp-high">${h.expected != null ? temp(h.expected) + '\u00B0' : '\u2014'}</div>
-        ${low != null ? `<div class="temp-divider">/</div><div class="temp-low">${temp(low)}\u00B0</div>` : ''}
+        ${low != null && lowData.url ? `<div class="temp-divider">/</div><a class="temp-low" href="${lowData.url}" target="_blank" rel="noopener">${temp(low)}\u00B0</a>` : low != null ? `<div class="temp-divider">/</div><div class="temp-low">${temp(low)}\u00B0</div>` : ''}
       </div>
       <div class="temp-label">${low != null ? 'High / Low' : 'Expected High'}</div>
-      ${rain != null ? `<div class="rain-row">
+      ${rain != null && rainData.url ? `<a class="rain-row" href="${rainData.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">
+        <span>\u{1F4A7}</span>
+        <span>${rain}%</span>
+        <div class="rain-bar-track"><div class="rain-bar-fill" style="width:${rain}%"></div></div>
+      </a>` : rain != null ? `<div class="rain-row">
         <span>\u{1F4A7}</span>
         <span>${rain}%</span>
         <div class="rain-bar-track"><div class="rain-bar-fill" style="width:${rain}%"></div></div>
@@ -623,6 +638,12 @@ function renderCards(highs, lows, rains) {
   }).join('') + '</div>';
 
   content.innerHTML = html;
+  content.querySelectorAll('.card[data-href]').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('a')) return;
+      window.open(card.dataset.href, '_blank', 'noopener');
+    });
+  });
 }
 
 async function loadCity(city) {

@@ -1,17 +1,19 @@
 const CITIES = {
-  "new-york":      { high: "KXHIGHNY",    low: "KXLOWTNYC",  rain: "KXRAINNYC" },
-  "chicago":       { high: "KXHIGHCHI",   low: "KXLOWTCHI",  rain: "KXRAINCHIM" },
-  "miami":         { high: "KXHIGHMIA",   low: null,         rain: "KXRAINMIAM" },
-  "denver":        { high: "KXHIGHDEN",   low: "KXLOWTDEN",  rain: "KXRAINDENM" },
-  "austin":        { high: "KXHIGHAUS",   low: null,         rain: "KXRAINAUSM" },
-  "los-angeles":   { high: "KXHIGHLAX",   low: "KXLOWTLAX",  rain: "KXRAINLAXM" },
-  "las-vegas":     { high: "KXHIGHTLV",   low: null,         rain: null },
-  "washington-dc": { high: "KXHIGHTDC",   low: null,         rain: null },
-  "seattle":       { high: "KXHIGHTSEA",  low: null,         rain: "KXRAINSEAM" },
-  "new-orleans":   { high: "KXHIGHTNOLA", low: null,         rain: null },
-  "san-francisco": { high: "KXHIGHTSFO",  low: null,         rain: "KXRAINSFOM" },
-  "philadelphia":  { high: "KXHIGHPHIL",  low: null,         rain: null },
+  "new-york":      { high: "KXHIGHNY",    highSlug: "highest-temperature-in-nyc",              low: "KXLOWTNYC",  lowSlug: "lowest-temperature-in-nyc",     rain: "KXRAINNYC",  rainSlug: "nyc-rain" },
+  "chicago":       { high: "KXHIGHCHI",   highSlug: "highest-temperature-in-chicago",          low: "KXLOWTCHI",  lowSlug: "lowest-temperature-in-chicago", rain: "KXRAINCHIM", rainSlug: "rain-chicago" },
+  "miami":         { high: "KXHIGHMIA",   highSlug: "highest-temperature-in-miami",            low: null, lowSlug: null,                                    rain: "KXRAINMIAM", rainSlug: "rain-miami" },
+  "denver":        { high: "KXHIGHDEN",   highSlug: "highest-temperature-in-denver",           low: "KXLOWTDEN",  lowSlug: "lowest-temperature-in-denver",  rain: "KXRAINDENM", rainSlug: "rain-denver" },
+  "austin":        { high: "KXHIGHAUS",   highSlug: "highest-temperature-in-austin",           low: null, lowSlug: null,                                    rain: "KXRAINAUSM", rainSlug: "rain-austin" },
+  "los-angeles":   { high: "KXHIGHLAX",   highSlug: "highest-temperature-in-los-angeles",      low: "KXLOWTLAX",  lowSlug: "lowest-temperature-in-la",      rain: "KXRAINLAXM", rainSlug: "rain-los-angeles" },
+  "las-vegas":     { high: "KXHIGHTLV",   highSlug: "highest-temperature-in-las-vegas",        low: null, lowSlug: null,                                    rain: null, rainSlug: null },
+  "washington-dc": { high: "KXHIGHTDC",   highSlug: "highest-temperature-in-washington-dc",    low: null, lowSlug: null,                                    rain: null, rainSlug: null },
+  "seattle":       { high: "KXHIGHTSEA",  highSlug: "highest-temperature-in-seattle",          low: null, lowSlug: null,                                    rain: "KXRAINSEAM", rainSlug: "rain-seattle" },
+  "new-orleans":   { high: "KXHIGHTNOLA", highSlug: "highest-temperature-in-new-orleans",      low: null, lowSlug: null,                                    rain: null, rainSlug: null },
+  "san-francisco": { high: "KXHIGHTSFO",  highSlug: "highest-temperature-in-san-francisco",    low: null, lowSlug: null,                                    rain: "KXRAINSFOM", rainSlug: "rain-san-francisco" },
+  "philadelphia":  { high: "KXHIGHPHIL",  highSlug: "highest-temperature-in-philadelphia",     low: null, lowSlug: null,                                    rain: null, rainSlug: null },
 };
+
+const KALSHI_BASE = "https://kalshi.com/markets";
 
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const CACHE_TTL = 300;
@@ -32,7 +34,11 @@ function parseDateFromTicker(ticker) {
   return `${2000 + parseInt(m[1])}-${String(months[m[2]] + 1).padStart(2, '0')}-${m[3]}`;
 }
 
-function parseTempEvents(data, type) {
+function kalshiUrl(seriesTicker, seriesSlug, eventTicker) {
+  return `${KALSHI_BASE}/${seriesTicker.toLowerCase()}/${seriesSlug}/${eventTicker.toLowerCase()}`;
+}
+
+function parseTempEvents(data, type, seriesTicker, seriesSlug) {
   if (!data || !data.events) return [];
   return data.events.map(event => {
     const date = parseDateFromTicker(event.event_ticker);
@@ -64,20 +70,20 @@ function parseTempEvents(data, type) {
       ? Math.round(bands.reduce((s, b) => s + b.mid * b.prob, 0) / totalProb)
       : null;
 
-    const result = { date, expected };
+    const result = { date, expected, url: kalshiUrl(seriesTicker, seriesSlug, event.event_ticker) };
     if (type === "high") result.bands = bands;
     return result;
   }).filter(Boolean);
 }
 
-function parseRainEvents(data) {
+function parseRainEvents(data, seriesTicker, seriesSlug) {
   if (!data || !data.events) return [];
   return data.events.map(event => {
     const date = parseDateFromTicker(event.event_ticker);
     const m = (event.markets || [])[0];
     if (!m) return null;
     const prob = (m.last_price || m.previous_price || 0) / 100;
-    return { date, chance: Math.round(prob * 100) };
+    return { date, chance: Math.round(prob * 100), url: kalshiUrl(seriesTicker, seriesSlug, event.event_ticker) };
   }).filter(Boolean);
 }
 
@@ -108,13 +114,13 @@ export async function onRequestGet(context) {
   const allOk = results.every(r => r != null);
 
   let idx = 0;
-  const highs = parseTempEvents(results[idx++], "high");
+  const highs = parseTempEvents(results[idx++], "high", cfg.high, cfg.highSlug);
 
   let lows = [];
-  if (cfg.low) lows = parseTempEvents(results[idx++], "low");
+  if (cfg.low) lows = parseTempEvents(results[idx++], "low", cfg.low, cfg.lowSlug);
 
   let rains = [];
-  if (cfg.rain) rains = parseRainEvents(results[idx++]);
+  if (cfg.rain) rains = parseRainEvents(results[idx++], cfg.rain, cfg.rainSlug);
 
   const body = JSON.stringify({ highs, lows, rains });
 
