@@ -486,6 +486,8 @@ window.addEventListener("popstate", () => {
   loadCity(city);
 });
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function apiFetch(seriesTicker) {
   const url = `/api/events?series_ticker=${seriesTicker}&status=open&with_nested_markets=true`;
   const resp = await fetch(url);
@@ -689,12 +691,14 @@ async function loadCity(city) {
 
     let lows = [];
     if (cfg.low) {
+      await sleep(500);
       const lowData = await apiFetch(cfg.low);
       lows = (lowData.events || []).map(parseLowTempEvent).filter(Boolean);
     }
 
     let rains = [];
     if (cfg.rain) {
+      await sleep(500);
       const rainData = await apiFetch(cfg.rain);
       rains = (rainData.events || []).map(parseRainEvent).filter(Boolean);
     }
