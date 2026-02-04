@@ -105,6 +105,8 @@ export async function onRequestGet(context) {
 
   const results = await Promise.all(fetches);
 
+  const allOk = results.every(r => r != null);
+
   let idx = 0;
   const highs = parseTempEvents(results[idx++], "high");
 
@@ -120,11 +122,13 @@ export async function onRequestGet(context) {
     status: 200,
     headers: {
       "Content-Type": "application/json",
-      "Cache-Control": `public, max-age=${CACHE_TTL}`,
+      "Cache-Control": allOk ? `public, max-age=${CACHE_TTL}` : "no-store",
     },
   });
 
-  context.waitUntil(cache.put(cacheKey, response.clone()));
+  if (allOk) {
+    context.waitUntil(cache.put(cacheKey, response.clone()));
+  }
 
   return response;
 }

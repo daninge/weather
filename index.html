@@ -116,6 +116,24 @@
   select:hover { border-color: rgba(255,255,255,0.15); }
   select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
 
+  .unit-toggle {
+    background: var(--card);
+    color: var(--accent);
+    border: 1px solid var(--border-light);
+    padding: 0.45rem 0.7rem;
+    border-radius: var(--radius-sm);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    min-width: 2.5rem;
+    text-align: center;
+  }
+
+  .unit-toggle:hover { border-color: var(--accent); background: var(--accent-glow); }
+  .unit-toggle:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
   .status {
     font-size: 0.75rem;
     color: var(--muted);
@@ -420,6 +438,7 @@
 
 <div class="controls">
   <select id="city-select"></select>
+  <button id="unit-toggle" class="unit-toggle" aria-label="Toggle temperature unit">°F</button>
   <span class="status" id="status"></span>
 </div>
 
@@ -447,7 +466,8 @@ function fromSlug(slug) {
 }
 
 function navigateTo(city) {
-  history.pushState(null, "", "/" + toSlug(city));
+  const qs = useCelsius ? "?unit=c" : "";
+  history.pushState(null, "", "/" + toSlug(city) + qs);
   document.title = `${city} Weather — Market Weather`;
   loadCity(city);
 }
@@ -461,6 +481,25 @@ function cityFromPath() {
 const select = document.getElementById("city-select");
 const content = document.getElementById("content");
 const statusEl = document.getElementById("status");
+const unitBtn = document.getElementById("unit-toggle");
+
+let useCelsius = new URLSearchParams(location.search).get("unit") === "c";
+let lastData = null;
+
+function fToC(f) { return Math.round((f - 32) * 5 / 9); }
+function temp(f) { return useCelsius ? fToC(f) : f; }
+function unitLabel() { return useCelsius ? "°C" : "°F"; }
+
+function updateUnitBtn() { unitBtn.textContent = useCelsius ? "°C" : "°F"; }
+
+function updateURL() {
+  const params = new URLSearchParams(location.search);
+  if (useCelsius) params.set("unit", "c");
+  else params.delete("unit");
+  const qs = params.toString();
+  const path = location.pathname + (qs ? "?" + qs : "");
+  history.replaceState(null, "", path);
+}
 
 CITIES.forEach(city => {
   const opt = document.createElement("option");
@@ -470,7 +509,15 @@ CITIES.forEach(city => {
 });
 
 select.addEventListener("change", () => navigateTo(select.value));
+unitBtn.addEventListener("click", () => {
+  useCelsius = !useCelsius;
+  updateUnitBtn();
+  updateURL();
+  if (lastData) renderCards(lastData.highs, lastData.lows, lastData.rains);
+});
 window.addEventListener("popstate", () => {
+  useCelsius = new URLSearchParams(location.search).get("unit") === "c";
+  updateUnitBtn();
   const city = cityFromPath();
   select.value = city;
   loadCity(city);
@@ -511,7 +558,15 @@ function barColor(prob, maxProb) {
   return "rgba(56, 189, 248, 0.3)";
 }
 
+function bandLabel(b) {
+  if (b.label.startsWith('>')) return `>${temp(b.low)}${unitLabel()}`;
+  if (b.label.startsWith('<')) return `<${temp(b.high)}${unitLabel()}`;
+  return `${temp(b.low)}-${temp(b.high)}${unitLabel()}`;
+}
+
 function renderCards(highs, lows, rains) {
+  lastData = { highs, lows, rains };
+
   const lowMap = {};
   lows.forEach(l => { if (l) lowMap[l.date] = l.expected; });
   const rainMap = {};
@@ -523,6 +578,7 @@ function renderCards(highs, lows, rains) {
   }
 
   highs.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const u = unitLabel();
 
   const html = '<div class="cards">' + highs.map(h => {
     const low = lowMap[h.date];
@@ -539,8 +595,8 @@ function renderCards(highs, lows, rains) {
         <div class="card-icon">${icon}</div>
       </div>
       <div class="card-temps">
-        <div class="temp-high">${h.expected != null ? h.expected + '\u00B0' : '\u2014'}</div>
-        ${low != null ? `<div class="temp-divider">/</div><div class="temp-low">${low}\u00B0</div>` : ''}
+        <div class="temp-high">${h.expected != null ? temp(h.expected) + '\u00B0' : '\u2014'}</div>
+        ${low != null ? `<div class="temp-divider">/</div><div class="temp-low">${temp(low)}\u00B0</div>` : ''}
       </div>
       <div class="temp-label">${low != null ? 'High / Low' : 'Expected High'}</div>
       ${rain != null ? `<div class="rain-row">
@@ -554,13 +610,13 @@ function renderCards(highs, lows, rains) {
           ${h.bands.map(b => {
             const pct = (b.prob / maxProb) * 100;
             return `<div class="chart-bar" style="height:${Math.max(pct, 4)}%;background:${barColor(b.prob, maxProb)};opacity:0.9">
-              <span class="tip">${b.label}: ${Math.round(b.prob * 100)}%</span>
+              <span class="tip">${bandLabel(b)}: ${Math.round(b.prob * 100)}%</span>
             </div>`;
           }).join('')}
         </div>
         <div class="chart-axis">
-          <span>${h.bands[0]?.label || ''}</span>
-          <span>${h.bands[h.bands.length - 1]?.label || ''}</span>
+          <span>${bandLabel(h.bands[0])}</span>
+          <span>${bandLabel(h.bands[h.bands.length - 1])}</span>
         </div>
       </div>
     </div>`;
@@ -593,9 +649,10 @@ async function loadCity(city) {
   }
 }
 
+updateUnitBtn();
 const initialCity = cityFromPath();
 select.value = initialCity;
-if (location.pathname === '/') history.replaceState(null, "", "/" + toSlug(initialCity));
+if (location.pathname === '/') history.replaceState(null, "", "/" + toSlug(initialCity) + (useCelsius ? "?unit=c" : ""));
 document.title = `${initialCity} Weather — Market Weather`;
 loadCity(initialCity);
 </script>
