@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Weather</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0b1120;
+    --surface: #141c2e;
+    --card: #1a2438;
+    --card-hover: #1f2d45;
+    --text: #eaf0f9;
+    --muted: #7a8ba5;
+    --accent: #38bdf8;
+    --accent-glow: rgba(56, 189, 248, 0.15);
+    --warm: #fb923c;
+    --warm-glow: rgba(251, 146, 60, 0.12);
+    --cool: #22d3ee;
+    --rain: #a78bfa;
+    --rain-glow: rgba(167, 139, 250, 0.12);
+    --border: rgba(255,255,255,0.06);
+    --border-light: rgba(255,255,255,0.1);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Header ── */
+  header {
+    position: relative;
+    text-align: center;
+    padding: 3rem 1.5rem 2rem;
+    background: linear-gradient(170deg, #0f1b33 0%, #162040 40%, #1a2850 100%);
+    overflow: hidden;
+  }
+
+  header::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(56,189,248,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  header h1 {
+    position: relative;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+  }
+
+  header h1 span {
+    background: linear-gradient(135deg, var(--accent) 0%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  header p {
+    position: relative;
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    font-weight: 400;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(12px);
+  }
+
+  select {
+    appearance: none;
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border-light);
+    padding: 0.6rem 2.2rem 0.6rem 0.9rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%237a8ba5'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7rem center;
+  }
+
+  select:hover { border-color: rgba(255,255,255,0.15); }
+  select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+  .status {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .status.error { color: #f87171; }
+
+  /* ── Cards Grid ── */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    padding: 1.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--warm) 0%, var(--accent) 100%);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    border-color: var(--border-light);
+  }
+
+  .card:hover::before { opacity: 1; }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .card-date {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+
+  .card-day {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 0.15rem;
+  }
+
+  .card-icon {
+    font-size: 1.8rem;
+    line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  }
+
+  .card-temps {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.6rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .temp-high {
+    font-size: 2.8rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    background: linear-gradient(180deg, #fdba74 0%, #fb923c 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .temp-divider {
+    font-size: 1.5rem;
+    color: var(--border-light);
+    font-weight: 300;
+    margin-bottom: 0.2rem;
+  }
+
+  .temp-low {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--cool);
+    margin-bottom: 0.15rem;
+  }
+
+  .temp-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    margin-top: 0.35rem;
+  }
+
+  /* ── Rain ── */
+  .rain-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.7rem;
+    background: var(--rain-glow);
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    color: var(--rain);
+    font-weight: 500;
+  }
+
+  .rain-bar-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(167, 139, 250, 0.15);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .rain-bar-fill {
+    height: 100%;
+    background: var(--rain);
+    border-radius: 2px;
+    transition: width 0.4s ease;
+  }
+
+  /* ── Chart ── */
+  .chart {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .chart-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+  }
+
+  .chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 56px;
+  }
+
+  .chart-bar {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+    min-width: 8px;
+    position: relative;
+    transition: opacity 0.15s;
+    cursor: default;
+  }
+
+  .chart-bar:hover { opacity: 1 !important; }
+
+  .chart-bar .tip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0f172a;
+    color: var(--text);
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    border: 1px solid var(--border-light);
+  }
+
+  .chart-bar:hover .tip { display: block; }
+
+  .chart-axis {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.6rem;
+    color: var(--muted);
+    margin-top: 4px;
+    font-weight: 500;
+  }
+
+  /* ── Loading ── */
+  .loading {
+    text-align: center;
+    padding: 5rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--border-light);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-bottom: 1rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Fade-in animation ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card { animation: fadeUp 0.35s ease both; }
+  .card:nth-child(2) { animation-delay: 0.05s; }
+  .card:nth-child(3) { animation-delay: 0.1s; }
+  .card:nth-child(4) { animation-delay: 0.15s; }
+  .card:nth-child(5) { animation-delay: 0.2s; }
+  .card:nth-child(6) { animation-delay: 0.25s; }
+  .card:nth-child(7) { animation-delay: 0.3s; }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+    border-top: 1px solid var(--border);
+    margin-top: 1rem;
+  }
+
+  footer a { color: var(--accent); text-decoration: none; font-weight: 500; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ── Mobile ── */
+  @media (max-width: 640px) {
+    header { padding: 2rem 1rem 1.5rem; }
+    header h1 { font-size: 1.6rem; }
+
+    .controls { padding: 0.75rem 1rem; }
+    select { width: 100%; font-size: 1rem; padding: 0.7rem 2.2rem 0.7rem 0.9rem; }
+
+    .cards {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+      padding: 0.75rem;
+    }
+
+    .card { padding: 1.25rem; border-radius: 14px; }
+    .temp-high { font-size: 2.4rem; }
+    .temp-low { font-size: 1.3rem; }
+    .card-icon { font-size: 1.5rem; }
+    .chart-bars { height: 48px; }
+  }
+
+  @media (max-width: 380px) {
+    .cards { padding: 0.5rem; }
+    .card { padding: 1rem; }
+    .temp-high { font-size: 2rem; }
+  }
+
+  /* ── Safe area for notch phones ── */
+  @supports (padding: env(safe-area-inset-top)) {
+    header { padding-top: calc(2rem + env(safe-area-inset-top)); }
+    .controls { padding-left: calc(1rem + env(safe-area-inset-left)); padding-right: calc(1rem + env(safe-area-inset-right)); }
+    .cards { padding-left: calc(1rem + env(safe-area-inset-left)); padding-right: calc(1rem + env(safe-area-inset-right)); }
+    footer { padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Market <span>Weather</span></h1>
+  <p>Forecasts derived from Kalshi prediction markets</p>
+</header>
+
+<div class="controls">
+  <select id="city-select"></select>
+  <span class="status" id="status"></span>
+</div>
+
+<div id="content">
+  <div class="loading"><div class="spinner"></div><br>Loading forecast...</div>
+</div>
+
+<footer>
+  Data from <a href="https://kalshi.com" target="_blank" rel="noopener">Kalshi</a> prediction markets.
+  Reflects market consensus, not a traditional weather forecast.
+</footer>
+
+<script>
+const CITIES = {
+  "New York":      { high: "KXHIGHNY",    low: "KXLOWTNYC",  rain: "KXRAINNYC" },
+  "Chicago":       { high: "KXHIGHCHI",   low: "KXLOWTCHI",  rain: "KXRAINCHIM" },
+  "Miami":         { high: "KXHIGHMIA",   low: null,         rain: "KXRAINMIAM" },
+  "Denver":        { high: "KXHIGHDEN",   low: "KXLOWTDEN",  rain: "KXRAINDENM" },
+  "Austin":        { high: "KXHIGHAUS",   low: null,         rain: "KXRAINAUSM" },
+  "Los Angeles":   { high: "KXHIGHLAX",   low: "KXLOWTLAX",  rain: "KXRAINLAXM" },
+  "Las Vegas":     { high: "KXHIGHTLV",   low: null,         rain: null },
+  "Washington DC": { high: "KXHIGHTDC",   low: null,         rain: null },
+  "Seattle":       { high: "KXHIGHTSEA",  low: null,         rain: "KXRAINSEAM" },
+  "New Orleans":   { high: "KXHIGHTNOLA", low: null,         rain: null },
+  "San Francisco": { high: "KXHIGHTSFO",  low: null,         rain: "KXRAINSFOM" },
+  "Philadelphia":  { high: "KXHIGHPHIL",  low: null,         rain: null },
+};
+
+function toSlug(city) {
+  return city.toLowerCase().replace(/\s+/g, '-');
+}
+
+function fromSlug(slug) {
+  return Object.keys(CITIES).find(c => toSlug(c) === slug) || null;
+}
+
+function navigateTo(city) {
+  history.pushState(null, "", "/" + toSlug(city));
+  document.title = `${city} Weather — Market Weather`;
+  loadCity(city);
+}
+
+function cityFromPath() {
+  const slug = location.pathname.replace(/^\/+|\/+$/g, '');
+  if (!slug) return Object.keys(CITIES)[0];
+  return fromSlug(slug) || Object.keys(CITIES)[0];
+}
+
+const select = document.getElementById("city-select");
+const content = document.getElementById("content");
+const statusEl = document.getElementById("status");
+
+Object.keys(CITIES).forEach(city => {
+  const opt = document.createElement("option");
+  opt.value = city;
+  opt.textContent = city;
+  select.appendChild(opt);
+});
+
+select.addEventListener("change", () => navigateTo(select.value));
+window.addEventListener("popstate", () => {
+  const city = cityFromPath();
+  select.value = city;
+  loadCity(city);
+});
+
+async function apiFetch(seriesTicker) {
+  const url = `/api/events?series_ticker=${seriesTicker}&status=open&with_nested_markets=true`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`API ${resp.status}`);
+  return resp.json();
+}
+
+function parseDateFromTicker(ticker) {
+  const m = ticker.match(/(\d{2})([A-Z]{3})(\d{2})$/);
+  if (!m) return null;
+  const months = { JAN:0, FEB:1, MAR:2, APR:3, MAY:4, JUN:5, JUL:6, AUG:7, SEP:8, OCT:9, NOV:10, DEC:11 };
+  const year = 2000 + parseInt(m[1]);
+  const month = months[m[2]];
+  const day = parseInt(m[3]);
+  if (month === undefined) return null;
+  return new Date(year, month, day);
+}
+
+function parseHighTempEvent(event) {
+  const date = parseDateFromTicker(event.event_ticker);
+  const markets = event.markets || [];
+  if (!markets.length) return null;
+
+  const bands = [];
+  markets.forEach(m => {
+    const prob = (m.last_price || m.previous_price || 0) / 100;
+    if (prob <= 0) return;
+    const st = (m.strike_type || "").toLowerCase();
+    const floor = m.floor_strike;
+    const cap = m.cap_strike;
+
+    if (st === "between" && floor != null && cap != null) {
+      bands.push({ low: floor, high: cap, mid: (floor + cap) / 2, prob, label: `${floor}-${cap}°F` });
+    } else if (st === "greater" && floor != null) {
+      bands.push({ low: floor, high: floor + 5, mid: floor + 2, prob, label: `>${floor}°F` });
+    } else if (st === "less" && cap != null) {
+      bands.push({ low: cap - 5, high: cap, mid: cap - 2, prob, label: `<${cap}°F` });
+    }
+  });
+
+  if (!bands.length) return null;
+  bands.sort((a, b) => a.mid - b.mid);
+
+  const totalProb = bands.reduce((s, b) => s + b.prob, 0);
+  const expected = totalProb > 0
+    ? bands.reduce((s, b) => s + b.mid * b.prob, 0) / totalProb
+    : null;
+
+  return { date, expected: expected != null ? Math.round(expected) : null, bands };
+}
+
+function parseLowTempEvent(event) {
+  const date = parseDateFromTicker(event.event_ticker);
+  const markets = event.markets || [];
+  if (!markets.length) return null;
+
+  const bands = [];
+  markets.forEach(m => {
+    const prob = (m.last_price || m.previous_price || 0) / 100;
+    if (prob <= 0) return;
+    const st = (m.strike_type || "").toLowerCase();
+    const floor = m.floor_strike;
+    const cap = m.cap_strike;
+
+    if (st === "between" && floor != null && cap != null) {
+      bands.push({ mid: (floor + cap) / 2, prob });
+    } else if (st === "greater" && floor != null) {
+      bands.push({ mid: floor + 2, prob });
+    } else if (st === "less" && cap != null) {
+      bands.push({ mid: cap - 2, prob });
+    }
+  });
+
+  if (!bands.length) return null;
+  const totalProb = bands.reduce((s, b) => s + b.prob, 0);
+  const expected = totalProb > 0
+    ? bands.reduce((s, b) => s + b.mid * b.prob, 0) / totalProb
+    : null;
+
+  return { date, expected: expected != null ? Math.round(expected) : null };
+}
+
+function parseRainEvent(event) {
+  const date = parseDateFromTicker(event.event_ticker);
+  const markets = event.markets || [];
+  const m = markets[0];
+  if (!m) return null;
+  const prob = (m.last_price || m.previous_price || 0) / 100;
+  return { date, chance: Math.round(prob * 100) };
+}
+
+function formatDate(d) {
+  if (!d) return "";
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+function formatDay(d) {
+  if (!d) return "";
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+  return days[d.getDay()];
+}
+
+function dateKey(d) {
+  if (!d) return "";
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function weatherIcon(temp, rain) {
+  if (rain != null && rain > 50) return "\u{1F327}\u{FE0F}";
+  if (rain != null && rain > 20) return "\u{26C5}";
+  if (temp != null && temp >= 85) return "\u{2600}\u{FE0F}";
+  if (temp != null && temp >= 60) return "\u{1F324}\u{FE0F}";
+  if (temp != null && temp >= 32) return "\u{2601}\u{FE0F}";
+  return "\u{2744}\u{FE0F}";
+}
+
+function barColor(prob, maxProb) {
+  const ratio = prob / maxProb;
+  if (ratio > 0.7) return "rgba(56, 189, 248, 0.85)";
+  if (ratio > 0.4) return "rgba(56, 189, 248, 0.55)";
+  return "rgba(56, 189, 248, 0.3)";
+}
+
+function renderCards(highs, lows, rains) {
+  const lowMap = {};
+  lows.forEach(l => { if (l && l.date) lowMap[dateKey(l.date)] = l.expected; });
+  const rainMap = {};
+  rains.forEach(r => { if (r && r.date) rainMap[dateKey(r.date)] = r.chance; });
+
+  if (!highs.length) {
+    content.innerHTML = '<div class="loading">No forecast data available for this city.</div>';
+    return;
+  }
+
+  highs.sort((a, b) => (a.date || 0) - (b.date || 0));
+
+  const html = '<div class="cards">' + highs.map(h => {
+    const dk = dateKey(h.date);
+    const low = lowMap[dk];
+    const rain = rainMap[dk];
+    const maxProb = Math.max(...h.bands.map(b => b.prob), 0.01);
+    const icon = weatherIcon(h.expected, rain);
+
+    return `<div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-date">${formatDate(h.date)}</div>
+          <div class="card-day">${formatDay(h.date)}</div>
+        </div>
+        <div class="card-icon">${icon}</div>
+      </div>
+      <div class="card-temps">
+        <div class="temp-high">${h.expected != null ? h.expected + '\u00B0' : '\u2014'}</div>
+        ${low != null ? `<div class="temp-divider">/</div><div class="temp-low">${low}\u00B0</div>` : ''}
+      </div>
+      <div class="temp-label">${low != null ? 'High / Low' : 'Expected High'}</div>
+      ${rain != null ? `<div class="rain-row">
+        <span>\u{1F4A7}</span>
+        <span>${rain}%</span>
+        <div class="rain-bar-track"><div class="rain-bar-fill" style="width:${rain}%"></div></div>
+      </div>` : ''}
+      <div class="chart">
+        <div class="chart-label">Probability Distribution</div>
+        <div class="chart-bars">
+          ${h.bands.map(b => {
+            const pct = (b.prob / maxProb) * 100;
+            return `<div class="chart-bar" style="height:${Math.max(pct, 4)}%;background:${barColor(b.prob, maxProb)};opacity:0.9">
+              <span class="tip">${b.label}: ${Math.round(b.prob * 100)}%</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="chart-axis">
+          <span>${h.bands[0]?.label || ''}</span>
+          <span>${h.bands[h.bands.length - 1]?.label || ''}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+
+  content.innerHTML = html;
+}
+
+async function loadCity(city) {
+  const cfg = CITIES[city];
+  if (!cfg) return;
+
+  select.value = city;
+  content.innerHTML = '<div class="loading"><div class="spinner"></div><br>Loading forecast...</div>';
+  statusEl.textContent = "";
+  statusEl.className = "status";
+
+  try {
+    const fetches = [apiFetch(cfg.high)];
+    if (cfg.low) fetches.push(apiFetch(cfg.low));
+    if (cfg.rain) fetches.push(apiFetch(cfg.rain));
+
+    const results = await Promise.all(fetches);
+
+    const highData = results[0];
+    const highs = (highData.events || []).map(parseHighTempEvent).filter(Boolean);
+
+    let lows = [];
+    let rains = [];
+    let idx = 1;
+
+    if (cfg.low) {
+      const lowData = results[idx++];
+      lows = (lowData.events || []).map(parseLowTempEvent).filter(Boolean);
+    }
+    if (cfg.rain) {
+      const rainData = results[idx++];
+      rains = (rainData.events || []).map(parseRainEvent).filter(Boolean);
+    }
+
+    renderCards(highs, lows, rains);
+
+    const now = new Date();
+    statusEl.textContent = `Updated ${now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = `Error: ${err.message}`;
+    statusEl.className = "status error";
+    content.innerHTML = '<div class="loading">Failed to load data. Please try again.</div>';
+  }
+}
+
+const initialCity = cityFromPath();
+select.value = initialCity;
+if (location.pathname === '/') history.replaceState(null, "", "/" + toSlug(initialCity));
+document.title = `${initialCity} Weather — Market Weather`;
+loadCity(initialCity);
+</script>
+</body>
+</html>
